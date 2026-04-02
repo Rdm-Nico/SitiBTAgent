@@ -1,7 +1,7 @@
 app: 
   name: follow-up
 server:
-  url: 172.18.31.238
+  url: ${oc.env:SERVER_GPU}
 provider: 
   use: vllm
 vllm:
@@ -41,7 +41,7 @@ ollama:
 database:
   is_db: True
   # host che nel caso di podman compose è il nome del servizio
-  postgres_server: 172.18.30.77
+  postgres_server: postgres
   sqlserver_server: srvlayer
   sqlserver_db_name: AI_REPO
   sqlserver_user: ai_repo

@@ -7,7 +7,7 @@ mkdir -p ~/.cache/huggingface
 
 # Creiamo le variabili d'ambiente
 GPU_ID="${GPU_ID:-gpu_1}"
-COLLECTOR_ENDPOINT="${COLLECTOR_ENDPOINT:-http://172.18.31.215:4318}"
+COLLECTOR_ENDPOINT="${COLLECTOR_ENDPOINT:-http://localhost:4318}"
 
 
 # Crea il pod

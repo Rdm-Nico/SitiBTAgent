@@ -1,7 +1,7 @@
 app:
   name: tecnico
 server:
-  url: 172.18.31.238
+  url: ${oc.env:SERVER_GPU}
 provider: 
   use: vllm
 vllm:

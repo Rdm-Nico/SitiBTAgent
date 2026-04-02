@@ -3,7 +3,7 @@ app:
   name: tecnico
 server:
   # server a cui fare riferimento per fare partire il modello AI
-  url: 172.18.31.178
+  url: ${oc.env:SERVER_GPU}
 provider: 
   # provider da utilizzare per fare partire il modello AI
   use: vllm
