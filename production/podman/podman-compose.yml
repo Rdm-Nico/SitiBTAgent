@@ -1,0 +1,144 @@
+services:
+  whatsapp-agent-tecnico:
+    image: localhost/whatsapp-agent-tecnico:testing
+    #build: se non si ha già l'immagine
+    #  context: .
+    #  dockerfile: Containerfile
+    container_name: sitibt-whatsapp-agent-tecnico
+    ports:
+      - "5000:5000"
+    environment:
+      # WhatsApp Configuration (from system environment)
+      - ACCESS_TOKEN_TECNICO=${ACCESS_TOKEN_TECNICO}
+      - VERIFY_TOKEN_TECNICO=${VERIFY_TOKEN_TECNICO}
+      - PHONE_ID=${PHONE_ID}
+
+      # Database Configuration (from system environment)
+      - SQLSERVER_PASSWORD=${SQLSERVER_PASSWORD}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+    volumes:
+      # Mount logs directory for persistence
+      - ../../logs/app_tecnico:/app/logs:Z
+      # Mount config file (if you want to modify without rebuild)
+      - ../../config_tecnico.yaml:/app/config.yaml:Z
+      # Mount history directory for save the chat 
+      - ../../history:/app/history:Z
+
+    restart: on-failure
+
+    networks:
+      - sitibt-network
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3.13", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  
+  whatsapp-agent-follow-up:
+    image: localhost/whatsapp-agent-follow-up:testing
+    #build: se non si ha già l'immagine
+    #  context: .
+    #  dockerfile: Containerfile
+    container_name: sitibt-whatsapp-agent-follow-up
+    ports:
+      - "6000:6000"
+    environment:
+      # WhatsApp Configuration (from system environment)
+      - ACCESS_TOKEN_FOLLOW_UP=${ACCESS_TOKEN_FOLLOW_UP}
+      - VERIFY_TOKEN_FOLLOW_UP=${VERIFY_TOKEN_FOLLOW_UP}
+      - PHONE_ID=${PHONE_ID}
+
+      # Database Configuration (from system environment)
+      - SQLSERVER_PASSWORD=${SQLSERVER_PASSWORD}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+    volumes:
+      # Mount logs directory for persistence
+      - ../../logs/app_follow_up:/app/logs:Z
+      # Mount config file (if you want to modify without rebuild)
+      - ../../config_follow_up.yaml:/app/config.yaml:Z
+      # Mount history directory for save the chat 
+      - ../../history:/app/history:Z
+
+    restart: on-failure
+
+    networks:
+      - sitibt-network
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3.13", "-c", "import requests; requests.get('http://localhost:6000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  statsd-exporter:
+    image: prom/statsd-exporter:v0.22.4
+    ports:
+      - "9125:9125"
+      - "9102:9102"
+    volumes:
+      - ./statsd.conf:/etc/statsd.conf:Z
+    command:
+      - --statsd.mapping-config=/etc/statsd.conf
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    entrypoint: /bin/sh
+    command:
+      - "-c"
+      - "ngrok start --all --config /etc/ngrok.yml --authtoken $${NGROK_AUTHTOKEN}"
+    volumes:
+      - ./ngrok.yml:/etc/ngrok.yml:Z
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    ports:
+    - "4040:4040"
+    networks:
+      - sitibt-network
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: postgres-pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: vectordb
+      #POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    entrypoint: ["/custom-entrypoint.sh"]
+    command: 
+      - "postgres"
+      - "-c"
+      - "listen_addresses=*"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-podman/postgres-data:/var/lib/postgresql/data:Z
+      - ./postgres-podman/postgres-init:/docker-entrypoint-initdb.d:Z
+      - ./postgres-podman/maintenance.sql:/maintenance.sql:Z
+      - ./postgres-podman/custom-entrypoint.sh:/custom-entrypoint.sh:Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    shm_size: 128mb
+    networks:
+      - sitibt-network
+
+volumes:
+  postgres-data:
+    driver: local
+  postgres-init:
+    driver: local
+
+networks:
+  sitibt-network:
+    driver: bridge

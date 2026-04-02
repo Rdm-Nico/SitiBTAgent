@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Scrape delle metriche dall'OpenTelemetry Collector
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8889']
+        labels:
+          service: 'opentelemetry-collector'
+  
+  # Scrape delle metriche di Prometheus stesso (opzionale)
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

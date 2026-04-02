@@ -1,0 +1,2 @@
+# per evitare di includere jupiter nella statistiche del linguaggio usato lo settiamo come 'documentazione'
+*.ipynb linguist-documentation=true

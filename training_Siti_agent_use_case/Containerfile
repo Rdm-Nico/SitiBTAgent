@@ -1,0 +1,45 @@
+FROM ubi10
+
+# install dependecies
+RUN dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm -y  \ 
+    && dnf update -y && dnf install https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-10.noarch.rpm -y \
+    # install python3.13
+    && dnf install python3.13 -y  \
+    # install uv 
+    && dnf install curl -y 
+    
+
+# working directory
+WORKDIR /workspace
+
+# install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# install node
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
+RUN source ~/.bashrc
+RUN nvm install node
+# clone the repo
+RUN git clone https://github.com/repo/agent-lightning.git
+WORKDIR /workspace/agent-lightning
+# install all dependecies
+RUN uv sync --frozen \
+    --extra apo \
+    --extra verl \
+    --group dev \
+    --group torch-gpu-stable \
+    --group trl \
+    --group agents \
+    --no-default-groups
+
+# copy the training folder 
+COPY training_Siti_agent_use_case/ /workspace/training_Siti_agent_use_case/
+
+# build also the dashboard 
+RUN cd /workspace/agent-lightning/dashboard
+RUN npm ci | npm run build
+
+# esponi porte per Ray
+EXPOSE 6379 8265
+
+CMD ["uv run 3.13", "/workspace/training_Siti_agent_use_case/train_siti_agent.py"]

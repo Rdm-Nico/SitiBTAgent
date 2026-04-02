@@ -1,0 +1,79 @@
+app:
+  name: tecnico
+server:
+  url: 172.18.31.238
+provider: 
+  use: vllm
+vllm:
+  chat_model:
+    source: unsloth/granite-4.0-micro-unsloth-bnb-4bit
+    url: http://${server.url}:8000
+    name: chat_agent
+    path: ./models/modelfiles/chat_modelfile.json
+  extractor_model:
+    source: unsloth/granite-4.0-micro-unsloth-bnb-4bit
+    url: http://${server.url}:8000
+    name: extractor_expert
+    path: ./models/modelfiles/extractor_modelfile.json
+  translate_model:
+    source: unsloth/granite-4.0-micro-unsloth-bnb-4bit
+    url: http://${server.url}:8000
+    name: translate_expert
+    path: ./models/modelfiles/translate_modelfile.json
+  embedding_model:
+    source: google/embeddinggemma-300m
+    url: http://${server.url}:8001
+ollama:
+  # base url of ollama
+  url: http://${server.url}:11434
+  chat_model:
+    source: granite4:latest
+    name: chat_agent
+    path: ./models/modelfiles/chat_modelfile.json
+  extractor_model:
+    source: granite4:latest
+    name: extractor_expert
+    path: ./models/modelfiles/extractor_modelfile.json
+  translate_model:
+    source: granite4:latest
+    name: translate_expert
+    path: ./models/modelfiles/translate_modelfile.json
+  embedding_model:
+    source: embeddinggemma:latest
+  generate_training_model: gpt-oss:20b
+database:
+  is_db: True
+  # host che nel caso di podman compose è il nome del servizio
+  postgres_server: postgres
+  sqlserver_server: srvlayer
+  sqlserver_db_name: AI_REPO
+  sqlserver_user: ai_repo
+  sqlserver_password: ${oc.env:SQLSERVER_PASSWORD}
+  sqlserver_conn: DRIVER={ODBC Driver 18 for SQL Server};SERVER=${.sqlserver_server};DATABASE=${.sqlserver_db_name};UID=${.sqlserver_user};PWD=${.sqlserver_password};TrustServerCertificate=yes
+  postgres_port: 5432
+  postgres_db_name_msg : msgdb
+  postgres_db_name_vector : vectordb
+  postgres_user: postgres
+  postgres_password: ${oc.env:POSTGRES_PASSWORD}
+  postgres_msg_conn: host=${.postgres_server} port=${.postgres_port} dbname=${.postgres_db_name_msg} user=${.postgres_user} password=${.postgres_password}
+  postgres_vectordb_conn: host=${.postgres_server} port=${.postgres_port} dbname=${.postgres_db_name_vector} user=${.postgres_user} password=${.postgres_password}
+  postgres_msg_table: commesse
+  postgres_vc_table: etichette
+  vector_dim: 512
+whatsapp:
+  port: 5000
+  access_token:  ${oc.env:ACCESS_TOKEN_TECNICO}
+  verify_token: ${oc.env:VERIFY_TOKEN_TECNICO}
+  version: v24.0
+  phone_id: ${oc.env:PHONE_ID}
+  url: https://graph.facebook.com/${.version}/${.phone_id}/messages
+whisper:
+  model: small
+info:
+  # ambiente: TEST/PROD
+  env: PROD
+  # salvare le chat in formato csv dentro alla cartella history
+  save_chat: True
+  # per salvare i dati in un csv per fare un report dei messaggi inviati
+  save_for_report: False
+

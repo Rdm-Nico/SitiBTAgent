@@ -1,0 +1,39 @@
+version: 3
+
+agent:
+  console_ui: true
+  web_addr: 0.0.0.0:4040
+
+endpoints:
+  - name: tecnico
+    upstream:
+      url: whatsapp-agent-tecnico:5000
+    traffic_policy:
+      on_http_request:
+      - expressions:
+        - req.url.path.startsWith('/webhook/tecnico')
+        actions:
+        - type: rate-limit
+          config:
+            name: Rate limit tecnico
+            algorithm: sliding_window
+            capacity: 30
+            rate: 60s
+            bucket_key:
+            - conn.client_ip
+  - name: follow-up
+    upstream:
+      url: whatsapp-agent-follow-up:6000
+    traffic_policy:
+      on_http_request:
+      - expressions:
+        - req.url.path.startsWith('/webhook/follow')
+        actions:
+        - type: rate-limit
+          config:
+            name: Rate limit follow-up
+            algorithm: sliding_window
+            capacity: 30
+            rate: 60s
+            bucket_key:
+            - conn.client_ip

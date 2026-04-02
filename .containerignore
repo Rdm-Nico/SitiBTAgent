@@ -1,0 +1,59 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Logs (will be generated in container)
+logs/*
+*.log
+
+# Data (should be mounted as volume)
+#data/*
+
+# History
+history/*
+
+# Visualization outputs
+visualization/*
+
+# Environment files (should be passed as env vars)
+.env
+
+# Test files
+test/
+*.test.py
+test_*.py
+
+# Cache
+.cache/
+.pytest_cache/
+
+# Claude files
+.claude/
+.claude.json
+.claude.json.backup
+
+# Other
+README.md
+.DS_Store
+Thumbs.db

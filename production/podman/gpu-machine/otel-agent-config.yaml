@@ -1,0 +1,60 @@
+# Otel exporter per inviare i dati di vllm 
+
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        # Scraping del servizio CHAT
+        - job_name: 'vllm-chat'
+          scrape_interval: 10s
+          static_configs:
+            - targets: ['localhost:8000']
+              labels:
+                service: 'granite-chat'
+                model_type: 'chat'
+        # Scraping del servizio EMBEDDINGS
+        - job_name: 'vllm-embeddings'
+          scrape_interval: 10s
+          static_configs:
+            - targets: ['localhost:8001']
+              labels:
+                service: 'embeddinggemma'
+                model_type: 'embeddings'
+processors:
+  batch:
+    timeout: 10s
+
+  resource:
+    attributes:
+      - key: hostname
+        value: ${env:HOSTNAME}
+        action: insert
+      - key: pod_name
+        value: llm-services
+        action: insert
+
+  attributes:
+    actions:
+      - key: host
+        value: ${env:HOST_IP}
+        action: insert
+
+
+exporters:
+  otlphttp:
+    endpoint: ${env:COLLECTOR_ENDPOINT}
+    tls:
+      insecure: true
+
+  # Debug logging (opzionale)
+  debug:
+    verbosity: normal
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+service:
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      processors: [batch, resource, attributes]
+      exporters: [otlphttp, debug]

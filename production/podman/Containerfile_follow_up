@@ -1,0 +1,71 @@
+FROM ubi10
+
+# Set working directory
+WORKDIR /app
+
+# install dependencies
+# install python3.13
+RUN dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm -y  \ 
+    && dnf update -y && dnf install https://mirrors.rpmfusion.org/free/el/rpmfusion-free-release-10.noarch.rpm -y \
+    # install python3.13
+    && dnf install python3.13 -y  \
+    # install pip for python3.13
+    && python3.13 -m ensurepip --upgrade \
+    && python3.13 -m pip install --upgrade pip \
+    && dnf install \
+    # For PostgreSQL driver
+    libpq-devel \
+    # For downloading Microsoft packages
+    curl \
+    gnupg2 \
+    ca-certificates \
+    # ffmpeg 
+    ffmpeg \
+    # Build tools for compiling Python packages
+    gcc \
+    g++ -y 
+
+# For pyodbc and SQL Server connectivity
+RUN curl -sSL -O https://packages.microsoft.com/config/rhel/$(grep VERSION_ID /etc/os-release | cut -d '"' -f 2 | cut -d '.' -f 1)/packages-microsoft-prod.rpm
+RUN dnf install packages-microsoft-prod.rpm -y
+RUN rm packages-microsoft-prod.rpm
+RUN dnf remove unixODBC-utf16 unixODBC-utf16-devel -y
+RUN ACCEPT_EULA=Y dnf install -y msodbcsql18 -y
+# go in the root of the project 
+RUN cd ..
+RUN cd ..
+# copy requirements file 
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN python3.13 -m pip install --no-cache-dir -r requirements.txt
+
+# Create necessary directories with open priviledges
+RUN mkdir -p /app/logs && chmod 777 /app/logs
+RUN mkdir -p /app/data && chmod 777 /app/data
+RUN mkdir -p /app/history && chmod 777 /app/history
+
+# Copy application files
+COPY run.py .
+# copy the production and rename with only config
+COPY config_follow_up.yaml ./config.yaml
+COPY whatsapp_agent_follow_up.py . 
+COPY whatsapp_agent_tecnico.py .
+COPY run_production.py . 
+
+# Copy directories & data
+COPY utils/ ./utils/
+COPY models/ ./models/
+COPY schema/ ./schema/
+COPY models/ ./models/
+COPY production/ ./production/
+COPY data/data_prova_follow_up.csv ./data/
+
+# Expose App port
+EXPOSE 6000
+
+
+# Run the application
+CMD ["python3.13", "run.py", "-c", "config.yaml"]
+
+
