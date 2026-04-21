@@ -10,6 +10,8 @@ from typing import Any, Dict, Optional, cast, List
 from transformers import AutoTokenizer
 from datasets import Dataset
 
+EXTRACTOR_MODEL_SYSTEM_PROMPT="Sei un assistente specializzato nell'estrazione di informazioni da messaggi per costruire una JSON.\n\nCOMPITO:\nAnalizza il messaggio dell'utente, identifica i dati rilevanti e costruisci un JSON con i campi specificati.\n\nREGOLE:\n- Estrai solo informazioni presenti esplicitamente nel testo\n- Se un campo richiesto non è presente nel messaggio, inserisci NULL\n- Non inventare o inferire dati non esplicitamente menzionati\n- Usa i valori esatti trovati nel testo\n- Costruisci il JSON nel formato richiesto\n\nCAMPI DA CERCARE:\ndevi cercare nel testo se si fa riferimento ai seguenti campi e salvali così come sono:\n- ore_ordinarie: ore di lavoro ordinarie effettuate\n- ore_straordinarie: ore di lavoro straorinario effettuate\n- ore_viaggio: ore di viaggio effettuate\n- durata_inefficienza: è un valore numerico che identifica quante ore a perso il tecnico per una inefficienza riscontrata a lavoro. se non trovi nessuna inefficienza settare questo campo a 0\n- note_inefficienza: usalo per inserire la descrizione dell'inefficienza che il tecnico ha riscontrato. Se non trovi nessuna inefficienza deve essere NULL. Deve essere breve e conciso.\n- note: usalo per inserire le cause per cui non ci sono state ore di lavoro oppure altre informazioni sulla giornata. Altrimenti deve essere NULL, deve essere breve e conciso senza l'utilizzo di tempi verbali. IMPORTANTE:la stringa deve essere sempre dentro a virgolette.\n- commessa: id della commessa di lavoro, è una stringa numerica in questo formato 250376, può essere non sempre presente, se non la si trova settare a NULL il campo\n\nOUTPUT:\nRestituisci il JSON costruito con i dati estratti e i campi esattamente come ti ho passato, ritorna unicamente il JSON.\nOUTPUT ESEMPIO:\n{\n  \"ore_ordinarie\": 0.0,\n  \"ore_straordinarie\": 0.0,\n  \"ore_viaggio\": 0.0,\n  \"DURATA_INEFFICIENCY\": 0.0,\n  \"note_inefficienza\":null,\n  \"note\": null,\n  \"commessa\": null\n}\nESEMPIO1:\n Ieri è stata una giornata di riposo\nOUTPUT:\n{\n  \"ore_ordinarie\": 0.0,\n  \"ore_straordinarie\": 0.0,\n  \"ore_viaggio\": 0.0,\n  \"durata_inefficienza\": 0.0,\n  \"note_inefficienza\":null,\n  \"note\": \"riposo\",\n  \"commessa\": null\n}\nESEMPIO2:\n  Ieri per la commessa 290120 ho fatto 7 ore di lavoro\nOUTPUT:\n{\n  \"ore_ordinarie\": 7.0,\n  \"ore_straordinarie\": 0.0,\n  \"ore_viaggio\": 0.0,\n  \"durata_inefficienza\": 0.0,\n  \"note_inefficienza\":null,\n  \"note\": null,\n  \"commessa\": 290120\n}\nESEMPIO3:\n  Ieri ho lavorato 5 ore ma ho avuto un problema che mi è costato un ora del mio tempo: il cliente non mi forniva un muletto per svolgere un operazione \nOUTPUT:\n{\n  \"ore_ordinarie\": 5.0,\n  \"ore_straordinarie\": 0.0,\n  \"ore_viaggio\": 0.0,\n  \"durata_inefficienza\": 1.0,\n  \"note_inefficienza\":\"cliente non mi forniva un muletto per svolgere un operazione\",\n  \"note\": null,\n  \"commessa\": null\n}"
+
 def post_process_agent_dataset(data):
     """
     function for post-process the data in a correct format for verl framework for agent conversational task.
@@ -315,6 +317,170 @@ def sft_process_agent(dt:List[Dict[str, Any]])->List[Dict[str, Any]]:
 
     return output_list
 
+def sft_process_extractor(dt:List[Dict[str, Any]])->List[Dict[str, Any]]:
+    """
+    Funzione per creare un dataset di tipo language modelling conversazionale.
+    lo schema dovrebbe essere:
+    sample = {
+    "messages": [
+        {
+            "role": "system",
+            "content": (
+                "Sei un assistente che estrae informazioni strutturate da report di lavoro giornalieri. "
+                "Rispondi SEMPRE e SOLO con un oggetto JSON valido che rispetta esattamente questo schema, "
+                "senza testo aggiuntivo, senza markdown, senza backtick:\n\n"
+                "{\n"
+                '  "ore_ordinarie": <float>,\n'
+                '  "ore_straordinarie": <float>,\n'
+                '  "ore_viaggio": <float>,\n'
+                '  "durata_inefficienza": <float>,\n'
+                '  "note": <string>,\n'
+                '  "commessa": <string>\n'
+                "}"
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                "fatto 8 ore di lavoro: preparazione fruste per alimentare i traini dei due essicatoi, "
+                "collegamento dei traini, posa sensori di movimento e raccordi. Ridimensionata la squadra "
+                "da 6/8 a 2–3 persone perché non c'era canale elettrico, un inefficiente che ha rallentato "
+                "il lavoro. Riorganizzato il lavoro per evitare fermo e mantenere la puntualità all'arrivo "
+                "del canale. Prevediamo comunque ritardi nella consegna dei macchinari."
+            )
+        },
+        {
+            "role": "assistant",
+            "content": (
+                '{"ore_ordinarie": 8.0, "ore_straordinarie": 0, "ore_viaggio": 0, '
+                '"durata_inefficienza": 0, '
+                '"note": "Inizio Preparazione fruste per alimentazione traini dei due essicatoi ed '
+                'collegamento dei traini, inizio posa sensori movimento traini, posa di raccordi vari.\\r\\n\\r\\n'
+                'Nota ho dovuto ridimensionare la squadra in questi primi giorni, da 6/8 persone a 2 massimo 3... '
+                'perché essendo assente di canale elettrico, ho dovuto riorganizzare tutto il lavoro, in modo che '
+                'nessuno sia fermo, così si arriva giusti all\'arrivo del canale elettrico, da quel momento in poi '
+                'all\'ora riavrò la squadra al completo, naturalmente ci saranno comunque ritardi sulle consegne '
+                'dei macchinari per via del canale che arriverà tardi, naturalmente cercando di recuperare il tempo", '
+                '"commessa": ""}'
+            )
+        }
+    ]
+}
+
+c'é da tenere conto anche della distribuzione delle lingue:
+per 200 righe di train:
+- 150 samples in italiano
+- 25 samples in inglese
+- 25 samples in spagnolo 
+stessa proporzione per i 30 samples di test
+    """
+    train_data = test_data = []
+    italian_occ =  english_occ = spanish_occ = 0
+    selected_ids = []
+
+    while(len(train_data) < 200):
+        # selezioniamo a caso un sample 
+        index = random.randint(0,len(dt))
+        if index in selected_ids:
+            continue
+        # controlliamo la lingua
+        user_msg = dt[index]['prompt'][0]["content"]
+        language = dt[index]['extra_info']['language']
+        gt = dt[index]['reward_model']['ground_truth']
+        if language == 'italian' and italian_occ > 150:
+            selected_ids.append(index)
+            continue
+        if language == 'english' and english_occ > 25:
+            selected_ids.append(index)
+            continue
+        if language == 'spanish' and spanish_occ > 25:
+            selected_ids.append(index)
+            continue
+        #  controlliamo che il json della gt sia corretto
+
+        try:
+            json.loads(json.dumps(gt))
+        except json.JSONDecodeError as e:
+            print(f"errore nel json malformato della gt, andiamo avanti") 
+            continue
+
+        sample = {
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": EXTRACTOR_MODEL_SYSTEM_PROMPT 
+                },
+                {
+                    "role": "user",
+                    "content": user_msg
+                },
+                {
+                    "role": "assistant",
+                    "content": json.dumps(gt)
+                }
+
+            ]
+        }
+
+        train_data.append(sample)
+        selected_ids.append(index)
+    
+    print(f"train df: {len(train_data)}")
+
+    # creo anche il test data 
+    italian_occ =  english_occ = spanish_occ = 0
+    while(len(test_data) < 30):
+        index = random.randint(0,len(dt))
+        if index in selected_ids:
+            continue
+        # controlliamo la lingua
+        user_msg = dt[index]['prompt'][0]["content"]
+        language = dt[index]['extra_info']['language']
+        gt = dt[index]['reward_model']['ground_truth']
+        if language == 'italian' and italian_occ > 20:
+            selected_ids.append(index)
+            continue
+        if language == 'english' and english_occ > 5:
+            selected_ids.append(index)
+            continue
+        if language == 'spanish' and spanish_occ > 5:
+            selected_ids.append(index)
+            continue
+        #  controlliamo che il json della gt sia corretto
+
+        try:
+            json.loads(json.dumps(gt))
+        except json.JSONDecodeError as e:
+            print(f"errore nel json malformato della gt, andiamo avanti") 
+            continue
+
+        sample = {
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": EXTRACTOR_MODEL_SYSTEM_PROMPT 
+                },
+                {
+                    "role": "user",
+                    "content": user_msg
+                },
+                {
+                    "role": "assistant",
+                    "content": json.dumps(gt)
+                }
+
+            ]
+        }
+
+        test_data.append(sample)
+        selected_ids.append(index)
+
+    print(f"test df: {len(test_data)}")
+    
+    return train_data, test_data
+
+
+
 
 def clean_dict(df:dict)->dict:
     """Funzione ricorsiva per pulire il dict da valori nulli"""
@@ -334,15 +500,21 @@ def main_SFT():
      Funzione per processare i dataset in formato adatto per trl SFT
     """
     # upload il train e il test
-    train_table = pq.read_table("/home/tecnico/SitiBT-Agent-AI/agent-lightning/training_siti/data/test_agent_w_embedding.parquet")
+    train_table = pq.read_table("./train_extractor.parquet")
     train_dataset = cast(List[Dict[str, Any]], train_table.to_pylist()) 
 
-    print(f"len del test prima del processo: {len(train_dataset)}")
-    train_post = sft_process_agent(train_dataset)
+    print(f"len del train prima del processo: {len(train_dataset)}")
+    train_post, test_post = sft_process_extractor(train_dataset)
+    print(train_post[0])
+    print('-'*90)
+    print(test_post[0])
+    
     # save as json
-    with open('test.json','w') as f:
+    with open('train_sft_extractor.json','w') as f:
         json.dump(train_post,f)
 
+    with open('../test/test_sft_extractor.json','w') as f:
+        json.dump(test_post,f)
 
     
     
