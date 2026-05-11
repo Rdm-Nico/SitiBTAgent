@@ -374,7 +374,8 @@ per 200 righe di train:
 - 25 samples in spagnolo 
 stessa proporzione per i 30 samples di test
     """
-    train_data = test_data = []
+    train_data = []
+    test_data = []
     italian_occ =  english_occ = spanish_occ = 0
     selected_ids = []
 
@@ -510,10 +511,10 @@ def main_SFT():
     print(test_post[0])
     
     # save as json
-    with open('train_sft_extractor.json','w') as f:
+    with open('train_sft_extractor_2.json','w') as f:
         json.dump(train_post,f)
 
-    with open('../test/test_sft_extractor.json','w') as f:
+    with open('../test/test_sft_extractor_2.json','w') as f:
         json.dump(test_post,f)
 
     
